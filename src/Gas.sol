@@ -4,13 +4,13 @@ pragma solidity ^0.8.0;
 import "./Ownable.sol";
 
 contract Constants {
-    uint256 public tradeFlag = 1;
-    uint256 public basicFlag = 0;
-    uint256 public dividendFlag = 1;
+    uint8 public tradeFlag = 1;
+    uint8 public basicFlag = 0;
+    uint8 public dividendFlag = 1;
 }
 
 contract GasContract is Ownable, Constants {
-    uint256 public totalSupply = 0; // cannot be updated
+    uint256 public immutable totalSupply = 0; // cannot be updated
     uint256 public paymentCounter = 0;
     mapping(address => uint256) public balances;
     uint256 public tradePercent = 12;
@@ -21,7 +21,7 @@ contract GasContract is Ownable, Constants {
     address[5] public administrators;
     bool public isReady = false;
     enum PaymentType {
-        Unknown,
+        Unknown, 
         BasicPayment,
         Refund,
         Dividend,
@@ -31,13 +31,13 @@ contract GasContract is Ownable, Constants {
 
     History[] public paymentHistory; // when a payment was updated
 
-    struct Payment {
+    struct Payment { // from low to high
         PaymentType paymentType;
-        uint256 paymentID;
-        bool adminUpdated;
-        string recipientName; // max 8 characters
-        address recipient;
+        bool adminUpdated; // 1 byte
+        bytes8 recipientName; // max 8 characters
         address admin; // administrators address
+        address recipient; 
+        uint256 paymentID;
         uint256 amount;
     }
 
@@ -200,7 +200,7 @@ contract GasContract is Ownable, Constants {
             "Gas Contract - Transfer function - Sender has insufficient Balance"
         );
         require(
-            bytes(_name).length < 9,
+            bytes(_name).length <= 8, // change to 8 characters
             "Gas Contract - Transfer function -  The recipient name is too long, there is a max length of 8 characters"
         );
         balances[senderOfTx] -= _amount;
@@ -212,7 +212,7 @@ contract GasContract is Ownable, Constants {
         payment.paymentType = PaymentType.BasicPayment;
         payment.recipient = _recipient;
         payment.amount = _amount;
-        payment.recipientName = _name;
+        payment.recipientName = bytes8(bytes(_name)); //changed to bytes8
         payment.paymentID = ++paymentCounter;
         payments[senderOfTx].push(payment);
         bool[] memory status = new bool[](tradePercent);
@@ -255,7 +255,7 @@ contract GasContract is Ownable, Constants {
                     senderOfTx,
                     _ID,
                     _amount,
-                    payments[_user][ii].recipientName
+                    string(abi.encodePacked(payments[_user][ii].recipientName)) //changed to bytes8
                 );
             }
         }
