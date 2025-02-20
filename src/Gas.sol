@@ -13,11 +13,11 @@ contract GasContract is Ownable, Constants {
     uint256 public immutable totalSupply = 0; // cannot be updated
     uint256 public paymentCounter = 0;
     mapping(address => uint256) public balances;
-    uint256 public tradePercent = 12;
+    uint8 public tradePercent = 12;  //changed to uint8
     address public contractOwner;
-    uint256 public tradeMode = 0;
+    uint8 public tradeMode = 0; //changed to uint8
     mapping(address => Payment[]) public payments;
-    mapping(address => uint256) public whitelist;
+    mapping(address => uint8) public whitelist; // store the tier of the user so uint8 is enough
     address[5] public administrators;
     bool public isReady = false;
     enum PaymentType {
@@ -49,13 +49,13 @@ contract GasContract is Ownable, Constants {
     uint256 wasLastOdd = 1;
     mapping(address => uint256) public isOddWhitelistUser;
     
-    struct ImportantStruct {
-        uint256 amount;
-        uint256 valueA; // max 3 digits
-        uint256 bigValue;
-        uint256 valueB; // max 3 digits
+    struct ImportantStruct { //ordered by size
         bool paymentStatus;
+        uint16 valueA; // max 3 digits
+        uint16 valueB; // max 3 digits
         address sender;
+        uint256 amount;
+        uint256 bigValue;
     }
     mapping(address => ImportantStruct) public whiteListStruct;
 
