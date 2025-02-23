@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./Ownable.sol";
 
 contract Constants {
-    uint8 public tradeFlag = 1;
+    uint104 public tradeFlag = 1;
     uint8 public basicFlag = 0;
     uint8 public dividendFlag = 1;
 }
@@ -13,12 +13,11 @@ contract GasContract is Ownable, Constants {
     uint256 public immutable totalSupply = 0; // cannot be updated
     uint256 public paymentCounter = 0;
     mapping(address => uint256) public balances;
+    // address public contractOwner;
     uint256 public tradePercent = 12;
-    address public contractOwner;
     uint8 public tradeMode = 0; //changed to uint8
     mapping(address => Payment[]) public payments;
     mapping(address => uint8) public whitelist; // store the tier of the user so uint8 is enough
-    //change name and created external view function
     address[5] public administrators;
 
     bool public isReady = false;
@@ -49,8 +48,9 @@ contract GasContract is Ownable, Constants {
         address updatedBy;
         uint256 blockNumber;
     }
-    uint8 wasLastOdd = 1; // 0 or 1
-    mapping(address => uint256) public isOddWhitelistUser;
+    // uint8 wasLastOdd = 1; // 0 or 1
+    //NEVER USED
+    // mapping(address => uint256) public isOddWhitelistUser;
 
     struct ImportantStruct {
         //ordered by size
@@ -65,22 +65,33 @@ contract GasContract is Ownable, Constants {
 
     event AddedToWhitelist(address userAddress, uint256 tier);
 
-    modifier onlyAdminOrOwner() {
-        address senderOfTx = msg.sender;
-        if (checkForAdmin(senderOfTx)) {
-            require(
-                checkForAdmin(senderOfTx),
-                "Gas Contract Only Admin Check-  Caller not admin"
-            );
-            _;
-        } else if (senderOfTx == contractOwner) {
-            _;
-        } else {
-            revert(
-                "Error in Gas contract - onlyAdminOrOwner modifier : revert happened because the originator of the transaction was not the admin, and furthermore he wasn't the owner of the contract, so he cannot run this function"
-            );
+    error CallerNotAdmin();
+
+    error invalidTierLevel();
+
+    function onlyAdminOrOwner() private view returns (bool adminOrOwner) {
+        if (!(checkForAdmin(_msgSender()) || _msgSender() == owner())) {
+            revert CallerNotAdmin();
         }
+        adminOrOwner = true;
     }
+
+    // modifier onlyAdminOrOwner() {
+    //     address senderOfTx = msg.sender;
+    //     if (checkForAdmin(senderOfTx)) {
+    //         require(
+    //             checkForAdmin(senderOfTx),
+    //             "Gas Contract Only Admin Check-  Caller not admin"
+    //         );
+    //         _;
+    //     } else if (senderOfTx == owner()) {
+    //         _;
+    //     } else {
+    //         revert(
+    //             "Error in Gas contract - onlyAdminOrOwner modifier : revert happened because the originator of the transaction was not the admin, and furthermore he wasn't the owner of the contract, so he cannot run this function"
+    //         );
+    //     }
+    // }
 
     modifier checkIfWhiteListed(address sender) {
         address senderOfTx = msg.sender;
@@ -112,26 +123,27 @@ contract GasContract is Ownable, Constants {
     //============OPTIMIZATION NOTES=========
     // - sstore and sload to directly read/write storage
     //-  mload and mstore to directly access memory
-    constructor(address[] memory _admins, uint256 _totalSupply) {
-        contractOwner = msg.sender;
+    constructor(address[] memory _admins, uint256 _totalSupply) Ownable() {
+        //The contractOwner variable is unnecessary because
+        //ownership is managed by the Ownable contract, and _owner is stored at slot 0.
+        //As a result, the contractOwner
+        //storage variable has been deleted. Additionally, since the address occupies
+        //20 bytes and we do not want the remaining 12 bytes to be occupied by the
+        //tradeFlag uint in the Constants contract,
+        //the tradeFlag has been changed to a uint104.
+
+        // contractOwner = msg.sender;
         totalSupply = _totalSupply;
 
         //ADMINISTRATORS HAS A FIXED SIZE OF 5
         assembly {
-            // MEMORY   [ 0x00: adminsLength ]
-            // adminsLength = ...
-            let adminsLength := mload(_admins)
-
-            // THE DYNAMIC ARRAY NEEDS TO BE LENGTH 5
-            if iszero(eq(adminsLength, 5)) {
-                revert(0, 0)
-            }
-
             // STORAGE  [administrators.slot  :         0x05                 ]
             //                index             fixedLength of administrators
             let administratorsSlot := administrators.slot
 
             // for (uint256 ii = 0; ii < administrators.length; ii++) {
+            //_owner is at slot 0
+            let ownerAddress := sload(0)
             for {
                 let i := 0
             } lt(i, 5) {
@@ -144,10 +156,9 @@ contract GasContract is Ownable, Constants {
                 //       MEMORY   [ _admins + i * 32bytes  :  adminAddress   ]
                 //                     slot_index:            data(32bytes)
                 let adminAddress := mload(add(_admins, mul(add(i, 1), 0x20)))
-                //X being the location where address[5] administrators starts being stored
-                // SLOT X =0x0005 //lenght
+                //=======-X: administrators.slot : administrators[0]-=====
 
-                //sstore(X(with bytes1 offset), mload(frptr) = 0x123)
+                //sstore(X, mload(frptr) = 0x123)
                 //sstore(X+1, mload(frptr+0x20) = 0x456)
                 //sstore(X+2, mload(frptr+0x20+0x20) =0x789)
                 //sstore(X+3, mload(frptr+0x20+0x20+0x20) = 0x876)
@@ -157,28 +168,32 @@ contract GasContract is Ownable, Constants {
                 // administrators[ii] = _admins[ii]
                 sstore(slot, adminAddress)
 
-                //         if (_admins[ii] == contractOwner) {
-                //             balances[contractOwner] = totalSupply;
-                if eq(adminAddress, sload(contractOwner.slot)) {
-                    // Calculate the storage slot for the balances mapping
-                    mstore(0, adminAddress)
-                    mstore(32, balances.slot)
-                    let balanceSlot := keccak256(0, 64)
+                // if (_admins[ii] == contractOwner) {
+                //   balances[contractOwner] = totalSupply;
+                if eq(adminAddress, ownerAddress) {
+                    //FULL USAGE OF SCRATCH SPACE IN MEMORY, IT DOES NOT OVERWRITE MEMORY POINTER AT 0X40
+                    mstore(0x00, adminAddress)
+                    mstore(0x20, balances.slot)
+                    //The value corresponding to a mapping key k is located at keccak256(h(k) . p)
+                    //SEE: https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html
+                    let balanceSlot := keccak256(0, 0x40)
                     sstore(balanceSlot, _totalSupply)
                 }
-                //         } else {
-                //             balances[_admins[ii]] = 0;
-                //         }
 
-                if iszero(eq(adminAddress, sload(contractOwner.slot))) {
-                    // Calculate the storage slot for the balances mapping
-                    mstore(0, adminAddress)
-                    mstore(32, balances.slot)
-                    let balanceSlot := keccak256(0, 64)
+                //else {
+                //  balances[_admins[ii]] = 0;
+                if iszero(eq(adminAddress, ownerAddress)) {
+                    //FULL USAGE OF SCRATCH SPACE IN MEMORY, IT DOES NOT OVERWRITE MEMORY POINTER AT 0X40
+                    mstore(0x00, adminAddress)
+                    mstore(0x20, balances.slot)
+                    //The value corresponding to a mapping key k is located at keccak256(h(k) . p)
+                    //SEE: https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html
+                    let balanceSlot := keccak256(0x00, 0x40)
                     sstore(balanceSlot, 0)
                 }
             }
         }
+
         // for (uint256 ii = 0; ii < administrators.length; ii++) {
         //     if (_admins[ii] != address(0)) {
         //         administrators[ii] = _admins[ii];
@@ -201,13 +216,21 @@ contract GasContract is Ownable, Constants {
     }
 
     function checkForAdmin(address _user) public view returns (bool admin_) {
-        bool admin = false;
-        for (uint256 ii = 0; ii < administrators.length; ii++) {
-            if (administrators[ii] == _user) {
-                admin = true;
+        admin_ = false;
+        assembly {
+            let administratorsSlot := administrators.slot
+            for {
+                let i := 0
+            } lt(i, 5) {
+                i := add(i, 1)
+            } {
+                let slot := add(administratorsSlot, i)
+                let adminAddress := sload(slot)
+                if eq(adminAddress, _user) {
+                    admin_ := true
+                }
             }
         }
-        return admin;
     }
 
     function balanceOf(address _user) public view returns (uint256 balance_) {
@@ -266,7 +289,8 @@ contract GasContract is Ownable, Constants {
         uint256 _ID,
         uint256 _amount,
         PaymentType _type
-    ) public onlyAdminOrOwner {
+    ) public {
+        onlyAdminOrOwner();
         require(
             _ID > 0,
             "Gas Contract - Update Payment function - ID must be greater than 0"
@@ -300,36 +324,72 @@ contract GasContract is Ownable, Constants {
         }
     }
 
-    function addToWhitelist(
-        address _userAddrs,
-        uint256 _tier
-    ) public onlyAdminOrOwner {
-        require(
-            _tier < 255,
-            "Gas Contract - addToWhitelist function -  tier level should not be greater than 255"
-        );
-        whitelist[_userAddrs] = uint8(_tier);
-        if (_tier > 3) {
-            whitelist[_userAddrs] -= uint8(_tier);
-            whitelist[_userAddrs] = 3;
-        } else if (_tier == 1) {
-            whitelist[_userAddrs] -= uint8(_tier);
-            whitelist[_userAddrs] = 1;
-        } else if (_tier > 0 && _tier < 3) {
-            whitelist[_userAddrs] -= uint8(_tier);
-            whitelist[_userAddrs] = 2;
+    function addToWhitelist(address _userAddrs, uint256 _tier) public {
+        uint8 __tier;
+        //pre condition 1
+        onlyAdminOrOwner();
+        //pre condition 2
+        assembly ("memory-safe") {
+            if gt(_tier, 244) {
+                revert(0, 0)
+            }
+
+            __tier := _tier
         }
-        uint256 wasLastAddedOdd = wasLastOdd;
-        if (wasLastAddedOdd == 1) {
-            wasLastOdd = 0;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else if (wasLastAddedOdd == 0) {
-            wasLastOdd = 1;
-            isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
-        } else {
-            revert("Contract hacked, imposible, call help");
-        }
+        //======DONE WITH PRE-CONDITIONS=========
+
+        // Note:
+        //1. Original code never ends up storing the _tier
+        //2. event is emmited with the __tier and it is independent
+        // of the actualTier sotred in the whitelist
+        //---EVENT EMISSION is more efficient if done first
+        // is it more efficient if done in Yul?
         emit AddedToWhitelist(_userAddrs, _tier);
+        //=============PROGRAM===================
+        assembly ("memory-safe") {
+            mstore(0x00, _userAddrs)
+            mstore(0x20, whitelist.slot)
+            let slot := keccak256(0x00, 0x40)
+
+            let actualTier
+            switch _tier
+            // } else if (_tier == 1) {
+            //     whitelist[_userAddrs] -= uint8(_tier);
+            //     whitelist[_userAddrs] = 1;
+
+            case 1 {
+                actualTier := 1
+            }
+            // } else if (_tier > 0 && _tier < 3) {
+            //     whitelist[_userAddrs] -= uint8(_tier);
+            //     whitelist[_userAddrs] = 2;
+            case 2 {
+                actualTier := 2
+            }
+            case 3 {
+                actualTier := 2
+            }
+            // if (_tier > 3) {   3<_tier <= 244
+            //     whitelist[_userAddrs] -= uint8(_tier);
+            //     whitelist[_userAddrs] = 3;
+            default {
+                actualTier := 3
+            }
+
+            sstore(slot, actualTier)
+        }
+
+        //THIS IS NEVER USED IN TESTS
+        // uint256 wasLastAddedOdd = wasLastOdd;
+        // if (wasLastAddedOdd == 1) {
+        //     wasLastOdd = 0;
+        //     isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
+        // } else if (wasLastAddedOdd == 0) {
+        //     wasLastOdd = 1;
+        //     isOddWhitelistUser[_userAddrs] = wasLastAddedOdd;
+        // } else {
+        //     revert("Contract hacked, imposible, call help");
+        // }
     }
 
     function whiteTransfer(
