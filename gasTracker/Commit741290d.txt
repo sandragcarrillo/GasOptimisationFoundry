@@ -1,0 +1,37 @@
+Compiling 2 files with Solc 0.8.26
+Solc 0.8.26 finished in 955.48ms
+Compiler run successful!
+
+Ran 12 tests for test/Gas.UnitTests.t.sol:GasTest
+[PASS] testAddToWhitelist(uint256) (runs: 256, μ: 48179, ~: 48112)
+[PASS] testBalanceOf() (gas: 14972)
+[PASS] testCheckForAdmin() (gas: 21973)
+[PASS] testTransfer(uint256,address) (runs: 256, μ: 74035, ~: 74607)
+[PASS] testWhiteTranferAmountUpdate(uint256,string,uint256) (runs: 256, μ: 251590, ~: 251829)
+[PASS] test_admins() (gas: 39576)
+[PASS] test_onlyOwner(address,uint256) (runs: 256, μ: 48337, ~: 48467)
+[PASS] test_tiers(address,uint256) (runs: 256, μ: 78941, ~: 78766)
+[PASS] test_tiersReverts(address,uint256) (runs: 256, μ: 46409, ~: 46423)
+[PASS] test_whitelistEvents(address,address,uint256,string,uint256) (runs: 256, μ: 240715, ~: 240847)
+[PASS] test_whitelistEvents(address,uint256) (runs: 256, μ: 81066, ~: 80948)
+[PASS] test_whitelistTransfer(address,address,uint256,string,uint256) (runs: 256, μ: 241292, ~: 241453)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 535.30ms (1.36s CPU time)
+| src/Gas.sol:GasContract contract |                 |        |        |        |         |
+|----------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                  | Deployment Size |        |        |        |         |
+| 2162095                          | 9868            |        |        |        |         |
+| Function Name                    | min             | avg    | median | max    | # calls |
+| addToWhitelist                   | 34445           | 66291  | 84832  | 85059  | 2048    |
+| administrators                   | 2521            | 2521   | 2521   | 2521   | 5       |
+| balanceOf                        | 591             | 2019   | 2591   | 2591   | 1793    |
+| balances                         | 596             | 1096   | 596    | 2596   | 1024    |
+| checkForAdmin                    | 11618           | 11618  | 11618  | 11618  | 1       |
+| getPaymentStatus                 | 780             | 780    | 780    | 780    | 256     |
+| transfer                         | 29166           | 51824  | 52085  | 52166  | 1024    |
+| whiteTransfer                    | 100879          | 101078 | 101143 | 101143 | 768     |
+| whitelist                        | 621             | 621    | 621    | 621    | 512     |
+
+
+
+
+Ran 1 test suite in 686.39ms (535.30ms CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)

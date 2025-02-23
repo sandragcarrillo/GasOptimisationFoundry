@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0; 
+pragma solidity ^0.8.0;
 
 import "./Ownable.sol";
 
@@ -13,15 +13,17 @@ contract GasContract is Ownable, Constants {
     uint256 public immutable totalSupply = 0; // cannot be updated
     uint256 public paymentCounter = 0;
     mapping(address => uint256) public balances;
-    uint256 public tradePercent = 12;  
+    uint256 public tradePercent = 12;
     address public contractOwner;
     uint8 public tradeMode = 0; //changed to uint8
     mapping(address => Payment[]) public payments;
     mapping(address => uint8) public whitelist; // store the tier of the user so uint8 is enough
+    //change name and created external view function
     address[5] public administrators;
+
     bool public isReady = false;
     enum PaymentType {
-        Unknown, 
+        Unknown,
         BasicPayment,
         Refund,
         Dividend,
@@ -31,12 +33,13 @@ contract GasContract is Ownable, Constants {
 
     History[] public paymentHistory; // when a payment was updated
 
-    struct Payment { // from low to high
+    struct Payment {
+        // from low to high
         PaymentType paymentType;
         bool adminUpdated; // 1 byte
         bytes8 recipientName; // max 8 characters
         address admin; // administrators address
-        address recipient; 
+        address recipient;
         uint32 paymentID; // may not exceed 4 billion
         uint256 amount;
     }
@@ -48,8 +51,9 @@ contract GasContract is Ownable, Constants {
     }
     uint8 wasLastOdd = 1; // 0 or 1
     mapping(address => uint256) public isOddWhitelistUser;
-    
-    struct ImportantStruct { //ordered by size
+
+    struct ImportantStruct {
+        //ordered by size
         bool paymentStatus;
         uint16 valueA; // max 3 digits
         uint16 valueB; // max 3 digits
@@ -105,28 +109,88 @@ contract GasContract is Ownable, Constants {
         string recipient
     );
     event WhiteListTransfer(address indexed);
-
+    //============OPTIMIZATION NOTES=========
+    // - sstore and sload to directly read/write storage
+    //-  mload and mstore to directly access memory
     constructor(address[] memory _admins, uint256 _totalSupply) {
         contractOwner = msg.sender;
         totalSupply = _totalSupply;
 
-        for (uint256 ii = 0; ii < administrators.length; ii++) {
-            if (_admins[ii] != address(0)) {
-                administrators[ii] = _admins[ii];
-                if (_admins[ii] == contractOwner) {
-                    balances[contractOwner] = totalSupply;
-                } else {
-                    balances[_admins[ii]] = 0;
+        //ADMINISTRATORS HAS A FIXED SIZE OF 5
+        assembly {
+            // MEMORY   [ 0x00: adminsLength ]
+            // adminsLength = ...
+            let adminsLength := mload(_admins)
+
+            // THE DYNAMIC ARRAY NEEDS TO BE LENGTH 5
+            if iszero(eq(adminsLength, 5)) {
+                revert(0, 0)
+            }
+
+            // STORAGE  [administrators.slot  :         0x05                 ]
+            //                index             fixedLength of administrators
+            let administratorsSlot := administrators.slot
+
+            // for (uint256 ii = 0; ii < administrators.length; ii++) {
+            for {
+                let i := 0
+            } lt(i, 5) {
+                i := add(i, 1)
+            } {
+                // Calculate the storage slot for the current administrator
+
+                let slot := add(administratorsSlot, i)
+                //THE DATA IS COMING FROM MEMORY THEN:
+                //       MEMORY   [ _admins + i * 32bytes  :  adminAddress   ]
+                //                     slot_index:            data(32bytes)
+                let adminAddress := mload(add(_admins, mul(add(i, 1), 0x20)))
+
+                // STORAGE [administrators+i: adminAddress(32bytes)]
+                // administrators[ii] = _admins[ii]
+                sstore(slot, adminAddress)
+
+                //         if (_admins[ii] == contractOwner) {
+                //             balances[contractOwner] = totalSupply;
+                if eq(adminAddress, sload(contractOwner.slot)) {
+                    // Calculate the storage slot for the balances mapping
+                    mstore(0, adminAddress)
+                    mstore(32, balances.slot)
+                    let balanceSlot := keccak256(0, 64)
+                    sstore(balanceSlot, _totalSupply)
                 }
-                if (_admins[ii] == contractOwner) {
-                    emit supplyChanged(_admins[ii], totalSupply);
-                } else if (_admins[ii] != contractOwner) {
-                    emit supplyChanged(_admins[ii], 0);
+                //         } else {
+                //             balances[_admins[ii]] = 0;
+                //         }
+
+                if iszero(eq(adminAddress, sload(contractOwner.slot))) {
+                    // Calculate the storage slot for the balances mapping
+                    mstore(0, adminAddress)
+                    mstore(32, balances.slot)
+                    let balanceSlot := keccak256(0, 64)
+                    sstore(balanceSlot, 0)
                 }
             }
         }
-    }
+        // for (uint256 ii = 0; ii < administrators.length; ii++) {
+        //     if (_admins[ii] != address(0)) {
+        //         administrators[ii] = _admins[ii];
+        //         if (_admins[ii] == contractOwner) {
+        //             balances[contractOwner] = totalSupply;
+        //         } else {
+        //             balances[_admins[ii]] = 0;
+        //         }
 
+        //         //THIS IF IS UNNECESSARY AS THE SUPPLY IS IMMUTABLE
+        //         if (_admins[ii] == contractOwner) {
+        //             //EVENT supplyChanged is ambigoud as it is nver called in tests
+        //             // and totalSupply is immutable
+        //             emit supplyChanged(_admins[ii], totalSupply);
+        //         } else if (_admins[ii] != contractOwner) {
+        //             emit supplyChanged(_admins[ii], 0);
+        //         }
+        //     }
+        // }
+    }
 
     function checkForAdmin(address _user) public view returns (bool admin_) {
         bool admin = false;
@@ -152,11 +216,10 @@ contract GasContract is Ownable, Constants {
         return mode;
     }
 
-
-    function addHistory(address _updateAddress, bool _tradeMode)
-        public
-        returns (bool status_, bool tradeMode_)
-    {
+    function addHistory(
+        address _updateAddress,
+        bool _tradeMode
+    ) public returns (bool status_, bool tradeMode_) {
         History memory history;
         history.blockNumber = block.number;
         history.lastUpdate = block.timestamp;
@@ -169,11 +232,10 @@ contract GasContract is Ownable, Constants {
         return ((status[0] == true), _tradeMode);
     }
 
-
     function transfer(
-    address _recipient,
-    uint256 _amount,
-    string calldata _name 
+        address _recipient,
+        uint256 _amount,
+        string calldata _name
     ) public returns (bool status_) {
         address senderOfTx = msg.sender;
         require(balances[senderOfTx] >= _amount, "Insufficient balance");
@@ -186,11 +248,10 @@ contract GasContract is Ownable, Constants {
         Payment memory payment;
         payment.recipient = _recipient;
         payment.amount = _amount;
-        payment.recipientName = bytes8(bytes(_name)); 
+        payment.recipientName = bytes8(bytes(_name));
 
         return true;
     }
-
 
     function updatePayment(
         address _user,
@@ -231,10 +292,10 @@ contract GasContract is Ownable, Constants {
         }
     }
 
-    function addToWhitelist(address _userAddrs, uint256 _tier)
-        public
-        onlyAdminOrOwner
-    {
+    function addToWhitelist(
+        address _userAddrs,
+        uint256 _tier
+    ) public onlyAdminOrOwner {
         require(
             _tier < 255,
             "Gas Contract - addToWhitelist function -  tier level should not be greater than 255"
@@ -268,7 +329,14 @@ contract GasContract is Ownable, Constants {
         uint256 _amount
     ) public checkIfWhiteListed(msg.sender) {
         address senderOfTx = msg.sender;
-        whiteListStruct[senderOfTx] = ImportantStruct(true, 0, 0, msg.sender, _amount, 0);
+        whiteListStruct[senderOfTx] = ImportantStruct(
+            true,
+            0,
+            0,
+            msg.sender,
+            _amount,
+            0
+        );
         require(
             balances[senderOfTx] >= _amount,
             "Gas Contract - whiteTransfers function - Sender has insufficient Balance"
@@ -281,12 +349,17 @@ contract GasContract is Ownable, Constants {
         balances[_recipient] += _amount;
         balances[senderOfTx] += whitelist[senderOfTx];
         balances[_recipient] -= whitelist[senderOfTx];
-        
+
         emit WhiteListTransfer(_recipient);
     }
 
-    function getPaymentStatus(address sender) public view returns (bool, uint256) {
-        return (whiteListStruct[sender].paymentStatus, whiteListStruct[sender].amount);
+    function getPaymentStatus(
+        address sender
+    ) public view returns (bool, uint256) {
+        return (
+            whiteListStruct[sender].paymentStatus,
+            whiteListStruct[sender].amount
+        );
     }
 
     receive() external payable {
@@ -294,6 +367,6 @@ contract GasContract is Ownable, Constants {
     }
 
     fallback() external payable {
-         payable(msg.sender).transfer(msg.value);
+        payable(msg.sender).transfer(msg.value);
     }
 }
