@@ -7,7 +7,6 @@
 - Try to get the gas usage as low as possible. 
 
 
-
 ## To run tests & gas report with verbatim trace 
 Run: `forge test --gas-report -vvvv`
 
