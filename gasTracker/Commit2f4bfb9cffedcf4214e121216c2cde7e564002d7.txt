@@ -1,0 +1,35 @@
+No files changed, compilation skipped
+
+Ran 12 tests for test/Gas.UnitTests.t.sol:GasTest
+[PASS] testAddToWhitelist(uint256) (runs: 256, μ: 47703, ~: 47629)
+[PASS] testBalanceOf() (gas: 14994)
+[PASS] testCheckForAdmin() (gas: 21724)
+[PASS] testTransfer(uint256,address) (runs: 256, μ: 73592, ~: 74741)
+[PASS] testWhiteTranferAmountUpdate(uint256,string,uint256) (runs: 256, μ: 244197, ~: 244267)
+[PASS] test_admins() (gas: 39576)
+[PASS] test_onlyOwner(address,uint256) (runs: 256, μ: 47882, ~: 48008)
+[PASS] test_tiers(address,uint256) (runs: 256, μ: 71510, ~: 71638)
+[PASS] test_tiersReverts(address,uint256) (runs: 256, μ: 44755, ~: 44792)
+[PASS] test_whitelistEvents(address,address,uint256,string,uint256) (runs: 256, μ: 233727, ~: 233938)
+[PASS] test_whitelistEvents(address,uint256) (runs: 256, μ: 73683, ~: 73808)
+[PASS] test_whitelistTransfer(address,address,uint256,string,uint256) (runs: 256, μ: 233974, ~: 234300)
+Suite result: ok. 12 passed; 0 failed; 0 skipped; finished in 1.09s (3.16s CPU time)
+| src/Gas.sol:GasContract contract |                 |        |        |        |         |
+|----------------------------------|-----------------|--------|--------|--------|---------|
+| Deployment Cost                  | Deployment Size |        |        |        |         |
+| 1677833                          | 7305            |        |        |        |         |
+| Function Name                    | min             | avg    | median | max    | # calls |
+| addToWhitelist                   | 32778           | 48264  | 56409  | 56625  | 2048    |
+| administrators                   | 2521            | 2521   | 2521   | 2521   | 5       |
+| balanceOf                        | 613             | 2039   | 2613   | 2613   | 1793    |
+| balances                         | 573             | 1073   | 573    | 2573   | 1024    |
+| checkForAdmin                    | 11369           | 11369  | 11369  | 11369  | 1       |
+| getPaymentStatus                 | 802             | 802    | 802    | 802    | 256     |
+| transfer                         | 27224           | 51749  | 52140  | 52212  | 1024    |
+| whiteTransfer                    | 100900          | 101087 | 101152 | 101152 | 768     |
+| whitelist                        | 620             | 620    | 620    | 620    | 512     |
+
+
+
+
+Ran 1 test suite in 1.37s (1.09s CPU time): 12 tests passed, 0 failed, 0 skipped (12 total tests)
