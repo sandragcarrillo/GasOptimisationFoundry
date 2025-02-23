@@ -144,6 +144,14 @@ contract GasContract is Ownable, Constants {
                 //       MEMORY   [ _admins + i * 32bytes  :  adminAddress   ]
                 //                     slot_index:            data(32bytes)
                 let adminAddress := mload(add(_admins, mul(add(i, 1), 0x20)))
+                //X being the location where address[5] administrators starts being stored
+                // SLOT X =0x0005 //lenght
+
+                //sstore(X(with bytes1 offset), mload(frptr) = 0x123)
+                //sstore(X+1, mload(frptr+0x20) = 0x456)
+                //sstore(X+2, mload(frptr+0x20+0x20) =0x789)
+                //sstore(X+3, mload(frptr+0x20+0x20+0x20) = 0x876)
+                //sstore(X+4, mload(frptr+0x20+0x20+0x20+0x20)0x768)
 
                 // STORAGE [administrators+i: adminAddress(32bytes)]
                 // administrators[ii] = _admins[ii]
