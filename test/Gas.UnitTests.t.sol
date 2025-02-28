@@ -84,7 +84,7 @@ contract GasTest is Test {
         vm.assume(_amount > 3);
         vm.assume(bytes(_name).length < 9);
         _tier = bound(_tier, 1, 244);
-        vm.startPran    k(owner);
+        vm.startPrank(owner);
         gas.transfer(_sender, _amount, _name);
         gas.addToWhitelist(_sender, _tier);
         vm.stopPrank();
