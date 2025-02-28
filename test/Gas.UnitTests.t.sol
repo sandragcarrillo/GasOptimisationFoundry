@@ -84,7 +84,7 @@ contract GasTest is Test {
         vm.assume(_amount > 3);
         vm.assume(bytes(_name).length < 9);
         _tier = bound(_tier, 1, 244);
-        vm.startPrank(owner);
+        vm.startPran    k(owner);
         gas.transfer(_sender, _amount, _name);
         gas.addToWhitelist(_sender, _tier);
         vm.stopPrank();
@@ -171,19 +171,19 @@ contract GasTest is Test {
             (_preRecipientAmount + _amount) - gas.whitelist(_sender)
         );
     }
-
+    //OPTIMIZED _init_
     function testBalanceOf() public view {
         uint256 bal = gas.balanceOf(owner);
         assertEq(bal, totalSupply);
     }
 
-    //OPTIMIZED whitelist  
+    //OPTIMIZED whitelist
 
     function testCheckForAdmin() public view {
         bool isAdmin = gas.checkForAdmin(owner);
         assertEq(isAdmin, true);
     }
-
+    // OPTIMIZED transfer
     function testTransfer(uint256 _amount, address _recipient) public {
         vm.assume(_amount <= totalSupply);
         vm.startPrank(owner);
