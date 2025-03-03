@@ -31,7 +31,7 @@ contract GasTest is Test {
         }
 
         vm.startPrank(owner);
-        gas = new GasContract(admins, totalSupply);
+        gas = new GasContract(admins);
         vm.stopPrank();
     }
     // OPTIMIZED _init_

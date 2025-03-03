@@ -12,7 +12,9 @@ struct ImportantStruct {
     // uint256 bigValue;
 }
 
-contract GasContract is Ownable {
+contract GasContract {
+    address private _owner;
+
     uint256 public constant totalSupply = 1000000000; // cannot be updated
     // uint256 public paymentCounter = 0;
     mapping(address => uint256) public balances;
@@ -24,7 +26,6 @@ contract GasContract is Ownable {
     // mapping(address => Payment[]) public payments;
     mapping(address => uint8) public whitelist; // store the tier of the user so uint8 is enough
     address[5] public administrators;
-    address private _owner;
 
     // bool public isReady = false;
     // enum PaymentType {
@@ -59,10 +60,11 @@ contract GasContract is Ownable {
     // mapping(address => uint256) public isOddWhitelistUser;
 
     event AddedToWhitelist(address userAddress, uint256 tier);
-    error _error();
     function onlyAdminOrOwner() private view returns (bool adminOrOwner) {
         if (!(checkForAdmin(_msgSender()) || _msgSender() == owner())) {
-            revert _error();
+            assembly ("memory-safe") {
+                revert(0, 0)
+            }
         }
         adminOrOwner = true;
     }
@@ -107,10 +109,7 @@ contract GasContract is Ownable {
     //============OPTIMIZATION NOTES=========
     // - sstore and sload to directly read/write storage
     //-  mload and mstore to directly access memory
-    constructor(
-        address[] memory _admins,
-        uint256 _totalSupply
-    ) payable Ownable() {
+    constructor(address[] memory _admins) payable {
         //The contractOwner variable is unnecessary because
         //ownership is managed by the Ownable contract, and _owner is stored at slot 0.
         //As a result, the contractOwner
@@ -122,6 +121,7 @@ contract GasContract is Ownable {
         // contractOwner = msg.sender;
 
         //ADMINISTRATORS HAS A FIXED SIZE OF 5
+        _transferOwnership(_msgSender());
         assembly {
             // STORAGE  [administrators.slot  :         0x05                 ]
             //                index             fixedLength of administrators
@@ -163,7 +163,7 @@ contract GasContract is Ownable {
                     //The value corresponding to a mapping key k is located at keccak256(h(k) . p)
                     //SEE: https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html
                     let balanceSlot := keccak256(0, 0x40)
-                    sstore(balanceSlot, _totalSupply)
+                    sstore(balanceSlot, totalSupply)
                 }
 
                 //else {
@@ -255,7 +255,9 @@ contract GasContract is Ownable {
         string calldata _name
     ) public returns (bool status_) {
         if (balances[_msgSender()] < _amount) {
-            revert _error();
+            assembly ("memory-safe") {
+                revert(0, 0)
+            }
         }
         status_ = true;
         unchecked {
@@ -269,6 +271,11 @@ contract GasContract is Ownable {
 
         emit Transfer(_recipient, _amount);
     }
+
+    function owner() public view virtual returns (address) {
+        return _owner;
+    }
+
     // function updatePayment(
     //     address _user,
     //     uint256 _ID,
@@ -381,7 +388,9 @@ contract GasContract is Ownable {
         address senderOfTx = _msgSender();
         whiteListStruct[senderOfTx] = ImportantStruct(true, _amount);
         if (balances[senderOfTx] < _amount || _amount <= 3) {
-            revert _error();
+            assembly ("memory-safe") {
+                revert(0, 0)
+            }
         }
         balances[senderOfTx] -= _amount;
         balances[_recipient] += _amount;
@@ -401,4 +410,16 @@ contract GasContract is Ownable {
     // receive() external payable {
     //     payable(_msgSender()).transfer(msg.value);
     // }
+
+    function _msgSender() internal view virtual returns (address) {
+        return msg.sender;
+    }
+
+    function _msgData() internal view virtual returns (bytes calldata) {
+        return msg.data;
+    }
+
+    function _transferOwnership(address newOwner) internal virtual {
+        _owner = newOwner;
+    }
 }
